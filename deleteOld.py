@@ -2,7 +2,7 @@ import psycopg2
 import pypsqlcon
 import sys
 
-print 'Deleting one week old or older data'
+print('Deleting one week old or older data')
 
 try:
     connection, cursor = pypsqlcon.createConnection()
