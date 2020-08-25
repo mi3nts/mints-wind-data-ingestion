@@ -1,11 +1,16 @@
 import os
-import urllib2
 import json
 import datetime
+import math
 import requests
 import psycopg2
 import pypsqlcon
 import sys
+
+try:
+    import urllib2
+except ModuleNotFoundError:
+    import urllib.request as urllib2
 
 #Future reference: Assuming that data is successfully stored into database,
 #we should not have to worry about keeping the data in these files and replace
@@ -25,9 +30,9 @@ year = current_datetime.year
 month = current_datetime.month
 day = current_datetime.day
 #refHour can be 00, 06, 12, or 18
-refHour = ((current_datetime.hour / 6) * 6)
+refHour = math.floor(current_datetime.hour / 6) * 6
 #recorded_hour ranges from 000 to 384 (0 to 16 days, every 3 hours)
-recorded_hour = (current_datetime.hour / 3) * 3
+recorded_hour = math.floor(current_datetime.hour / 3) * 3
 fdir = os.path.abspath(os.path.dirname(__file__))
 
 def convertData(year, month, day, refHour, needUpdate):
@@ -126,7 +131,7 @@ def getData(year, month, day, refHour):
     try:
         u = urllib2.urlopen(url)
     #The ref hour directory not available, access the previous ref hour directory
-    except urllib2.URLError, e:
+    except urllib2.URLError as e:
         print (e)
         #If reference hour is midnight
         if refHour == 0:
@@ -225,7 +230,7 @@ def getData(year, month, day, refHour):
         r.close()
         local = './data/data.grb2'
         dataPath = os.path.join(fdir, local)
-        f = open(dataPath, "w")
+        f = open(dataPath, "wb")
         content = u.read()
         f.write(content)
         f.close()
