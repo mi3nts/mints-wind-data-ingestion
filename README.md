@@ -3,7 +3,7 @@ This was separated from mints-noaa-api on August 12th, 2020.
 This python script gets wind data from NOAA and converts it into data that can be used for display on the sharedairdfw.com website.
 
 ### Usage
-* Python 2, PostgreSQL 10+ is required
+* Python 3, PostgreSQL 10+ is required
   * Python modules (install with pip):
     * requests
     * psycopg2
