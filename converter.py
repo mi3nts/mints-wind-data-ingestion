@@ -31,8 +31,6 @@ month = current_datetime.month
 day = current_datetime.day
 refHour = current_datetime.hour
 
-recordedHour = 3
-
 fdir = os.path.abspath(os.path.dirname(__file__))
 
 print(current_datetime)
@@ -68,9 +66,9 @@ def convertData(year, month, day, refHour, needUpdate):
         storeRecordedDay = datetime.datetime.utcnow().day
         storeRecordedMonth = datetime.datetime.utcnow().month
         storeRecordedYear = datetime.datetime.utcnow().year
-        data1[0]['recordedTime'] = str(storeRecordedYear) + '-' + "{:02d}".format(storeRecordedMonth) + '-' + "{:02d}".format(storeRecordedDay) + ' ' + "{:02d}".format(recordedHour) + ':00:00+00'
+        data1[0]['recordedTime'] = str(storeRecordedYear) + '-' + "{:02d}".format(storeRecordedMonth) + '-' + "{:02d}".format(storeRecordedDay) + ' ' + "{:02d}".format(refHour) + ':00:00+00'
     else:
-        data1[0]['recordedTime'] = str(year) + '-' + "{:02d}".format(month) + '-' + "{:02d}".format(day) + ' ' + "{:02d}".format(recordedHour) + ':00:00+00'
+        data1[0]['recordedTime'] = str(year) + '-' + "{:02d}".format(month) + '-' + "{:02d}".format(day) + ' ' + "{:02d}".format(refHour) + ':00:00+00'
 
     with open("u_comp.json", "w") as fo:
         json.dump(data1, fo)
@@ -82,9 +80,9 @@ def convertData(year, month, day, refHour, needUpdate):
         storeRecordedDay = datetime.datetime.utcnow().day
         storeRecordedMonth = datetime.datetime.utcnow().month
         storeRecordedYear = datetime.datetime.utcnow().year  
-        data2[0]['recordedTime'] = str(storeRecordedYear) + '-' + "{:02d}".format(storeRecordedMonth) + '-' + "{:02d}".format(storeRecordedDay) + ' ' + "{:02d}".format(recordedHour) + ':00:00+00'
+        data2[0]['recordedTime'] = str(storeRecordedYear) + '-' + "{:02d}".format(storeRecordedMonth) + '-' + "{:02d}".format(storeRecordedDay) + ' ' + "{:02d}".format(refHour) + ':00:00+00'
     else:
-        data2[0]['recordedTime'] = str(year) + '-' + "{:02d}".format(month) + '-' + "{:02d}".format(day) + ' ' + "{:02d}".format(recordedHour) + ':00:00+00'
+        data2[0]['recordedTime'] = str(year) + '-' + "{:02d}".format(month) + '-' + "{:02d}".format(day) + ' ' + "{:02d}".format(refHour) + ':00:00+00'
 
     with open("v_comp.json", "w") as fo:
         json.dump(data2, fo)
@@ -209,9 +207,9 @@ def getData(year, month, day, refHour):
             storeRecordedDay = datetime.datetime.utcnow().day
             storeRecordedMonth = datetime.datetime.utcnow().month
             storeRecordedYear = datetime.datetime.utcnow().year
-            datetimeFormat = str(storeRecordedYear) + '-' + "{:02d}".format(storeRecordedMonth) + '-' + "{:02d}".format(storeRecordedDay) + 'T' + "{:02d}".format(recordedHour) + ':00:00.000Z'
+            datetimeFormat = str(storeRecordedYear) + '-' + "{:02d}".format(storeRecordedMonth) + '-' + "{:02d}".format(storeRecordedDay) + 'T' + "{:02d}".format(refHour) + ':00:00.000Z'
         else:
-            datetimeFormat = str(year) + '-' + "{:02d}".format(month) + '-' + "{:02d}".format(day) + 'T' + "{:02d}".format(recordedHour) + ':00:00.000Z'
+            datetimeFormat = str(year) + '-' + "{:02d}".format(month) + '-' + "{:02d}".format(day) + 'T' + "{:02d}".format(refHour) + ':00:00.000Z'
         print(datetimeFormat)
         API_ENDPOINT = "https://api.sharedairdfw.com/wind_data/" + datetimeFormat
         r = urllib2.urlopen(API_ENDPOINT)
