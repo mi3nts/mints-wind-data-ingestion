@@ -1,1 +1,3 @@
 pypsqlcon.py
+.venv/
+__pycache__/
