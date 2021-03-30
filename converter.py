@@ -137,7 +137,7 @@ def getData(year, month, day, refHour, sentinel):
     # file name format: gfs.t<hour>z.pgrb2.1p00.f<hourWithinRef>
     fileName = 'gfs.t' + "{:02d}".format(refHour) + 'z.pgrb2.1p00.f' + "{:03d}".format(hourWithinRef)
     print("Attempt to download: " + fileName)
-    url = noaa + '?file=' + fileName + latLon + '&dir=%2Fgfs.' + str(year) + "{:02d}".format(month) + "{:02d}".format(day) + '%2F' + "{:02d}".format(refHour)
+    url = noaa + '?file=' + fileName + latLon + '&dir=%2Fgfs.' + str(year) + "{:02d}".format(month) + "{:02d}".format(day) + '%2F' + "{:02d}".format(refHour) + '/atmos'
 
     try:
         u = urllib2.urlopen(url)
