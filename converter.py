@@ -23,7 +23,7 @@ except ModuleNotFoundError:
 # Once the folder is up, get the equivalent timestamp for the new directory to get updated predictions
 
 current_datetime = datetime.datetime.utcnow()
-noaa = 'https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_1p00.pl'
+noaa = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/'
 latLon = '&leftlon=0&rightlon=360&toplat=90&bottomlat=-90'
 fdir = os.path.abspath(os.path.dirname(__file__))
 
@@ -137,7 +137,7 @@ def getData(year, month, day, refHour, sentinel):
     # file name format: gfs.t<hour>z.pgrb2.1p00.f<hourWithinRef>
     fileName = 'gfs.t' + "{:02d}".format(refHour) + 'z.pgrb2.1p00.f' + "{:03d}".format(hourWithinRef)
     print("Attempt to download: " + fileName)
-    url = noaa + '?file=' + fileName + latLon + '&dir=%2Fgfs.' + str(year) + "{:02d}".format(month) + "{:02d}".format(day) + '%2F' + "{:02d}".format(refHour) + '/atmos'
+    url = "{}/gfs.{}{:02d}{:02d}/{:02d}/atmos/{}".format(noaa, datetime.datetime.utcnow().year, datetime.datetime.utcnow().month, datetime.datetime.utcnow().day, refHour, fileName)
 
     try:
         u = urllib2.urlopen(url)
