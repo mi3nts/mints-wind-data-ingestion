@@ -22,35 +22,23 @@ except ModuleNotFoundError:
 # Do this if the directory is not up
 # Once the folder is up, get the equivalent timestamp for the new directory to get updated predictions
 
+API_ENDPOINT = "https://api.sharedairdfw.com/wind_data/"
+NOAA_ENDPOINT = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod'
+
 current_datetime = datetime.datetime.utcnow()
-noaa = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/'
 latLon = '&leftlon=0&rightlon=360&toplat=90&bottomlat=-90'
 fdir = os.path.abspath(os.path.dirname(__file__))
 
-# date format: <year><month><day>
-year = current_datetime.year
-# month = current_datetime.month
-month = 3
-day = current_datetime.day
+# Maximum number of files to check in history
+# NOAA gfs data only goes back about 10 days (4 files are available per 
+#   day based on different reference hours available)
+max_attempts = 40
 
-# refHour can be 00, 06, 12, or 18
-refHour = math.floor(current_datetime.hour / 6) * 6
-
-# recorded_hour ranges from 000 to 384 (0 to 16 days, every 3 hours)
-recorded_hour = math.floor(current_datetime.hour / 3) * 3
-
-# number of hours since last update
-hourWithinRef = abs(recorded_hour - refHour)
-
-# used to avoid infinite loop when searching back in time for data
-max_recursions = 6
-
-
-def convertData(year, month, day, refHour, needUpdate):
+def convertData(year, month, day, refHour, recorded_hour, needUpdate):
     goToGrib2JSON = './grib2json/target/grib2json-0.8.0-SNAPSHOT/bin'
     gribPath = os.path.join(fdir, goToGrib2JSON)
     os.chdir(gribPath)
-    print("goToGrib2JSON path")
+    print("[DEBUG] goToGrib2JSON path: {}".format(gribPath))
 
     # # ** will need to group the U and V data together by time or name of file **
     # (--fp) parameterNumber: 2 (U-component_of_wind)
@@ -64,7 +52,7 @@ def convertData(year, month, day, refHour, needUpdate):
     convertForVComponent = 'sh grib2json --names --data --fp 3 --fs 103 --fv 10.0 --output ../../../../data/v_comp.json ../../../../data/data.grb2'
     os.system(convertForVComponent)
 
-    print('Converting from grib2 to json: SUCCESS!')
+    print('[INFO] Converting from grib2 to json: SUCCESS!')
 
     goToData = '../../../../data'
     os.chdir(goToData)
@@ -102,7 +90,7 @@ def convertData(year, month, day, refHour, needUpdate):
     with open("wind_data.json", "w") as fo:
         json.dump(data1, fo)
 
-    print('Storing data onto files: SUCCESS!')
+    print('[INFO] Storing data onto files: SUCCESS!')
 
     connection, cursor = pypsqlcon.createConnection()
     if needUpdate == True:
@@ -110,7 +98,7 @@ def convertData(year, month, day, refHour, needUpdate):
             cursor.execute("DELETE from wind_data WHERE recorded_time = (%s)", (data1[0]['recordedTime'],))
             connection.commit()
         except (Exception, psycopg2.Error) as error:
-           print("Error while performing query", error)
+           print("[ERROR] Error while performing query", error)
         insertWindData(data1, connection, cursor)
     else:
         insertWindData(data1, connection, cursor)
@@ -126,93 +114,118 @@ def insertWindData(data, connection, cursor):
             cursor.execute("INSERT INTO wind_data(recorded_time, header, data) VALUES (%s, %s, %s);", (recordedTime, header, dataArray))
             connection.commit()
         except (Exception, psycopg2.Error) as error:
-            print("Error while performing query", error)
+            print("[ERROR] Error while performing query", error)
 
-def getData(year, month, day, refHour, sentinel):
-    # End recursion if max_recursions is hit
-    if sentinel <= 0:
-        print("Data file not found. Searched back {} hours".format(max_recursions * 6))
-        return
+def getData():
+    # date format: <year><month><day>
+    year = current_datetime.year
+    month = current_datetime.month
+    day = current_datetime.day
 
-    # file name format: gfs.t<hour>z.pgrb2.1p00.f<hourWithinRef>
-    fileName = 'gfs.t' + "{:02d}".format(refHour) + 'z.pgrb2.1p00.f' + "{:03d}".format(hourWithinRef)
-    print("Attempt to download: " + fileName)
-    url = "{}/gfs.{}{:02d}{:02d}/{:02d}/atmos/{}".format(noaa, datetime.datetime.utcnow().year, datetime.datetime.utcnow().month, datetime.datetime.utcnow().day, refHour, fileName)
+    # refHour can be 00, 06, 12, or 18
+    refHour = math.floor(current_datetime.hour / 6) * 6
 
-    try:
-        u = urllib2.urlopen(url)
-    # The ref hour directory not available, access the previous ref hour directory
-    except urllib2.URLError as e:
-        print (e)
-        # If reference hour is midnight
-        if refHour == 0:
-            # If first day of January
-            if month == 1 and day == 1:
-                # Go back a year
-                # Go back a day to December 31st (12/31)
-                getData(year - 1, 12, 31, 18, 5, sentinel - 1)
-            # If previous month has 30 days and current day is the first day of the current month
-            elif (month == 5 or month == 7 or month == 8 or month == 10 or month == 12) and day == 1:
-                # Go back a month
-                # Go back a day to the 30th
-                getData(year, month - 1, 30, 18, sentinel - 1)
-            # If current month is March and first day of the month
-            elif month == 3 and day == 1:
-                # If leap year
-                if year % 4 == 0:
-                    # Go back a month
-                    # Go back a day to the 29th
-                    getData(year, month - 1, 29, 18, sentinel - 1)
-                # If not leap year
+    # recorded_hour ranges from 000 to 384 (0 to 16 days, every 3 hours)
+    recorded_hour = math.floor(current_datetime.hour / 3) * 3
+
+    # number of hours since last update
+    hourWithinRef = abs(recorded_hour - refHour)
+
+    for attempt in range(0, max_attempts):
+        # file name format: gfs.t<hour>z.pgrb2.1p00.f<hourWithinRef>
+        fileName = 'gfs.t' + "{:02d}".format(refHour) + 'z.pgrb2.1p00.f' + "{:03d}".format(hourWithinRef)
+        url = "{}/gfs.{}{:02d}{:02d}/{:02d}/atmos/{}".format(NOAA_ENDPOINT, year, month, day, refHour, fileName)
+
+        print("[INFO] Attempt {}, downloading {}".format(attempt, url))
+
+        try:
+            fetched_data = urllib2.urlopen(url)
+
+            # Ref hour directory available
+            # Convert to UTC time, since refHour 18 in local time (CST) is already a new day in UTC
+            if refHour == 18:
+                storeRecordedDay = datetime.datetime.utcnow().day
+                storeRecordedMonth = datetime.datetime.utcnow().month
+                storeRecordedYear = datetime.datetime.utcnow().year
+                datetimeFormat = str(storeRecordedYear) + '-' + "{:02d}".format(storeRecordedMonth) + '-' + "{:02d}".format(storeRecordedDay) + 'T' + "{:02d}".format(recorded_hour) + ':00:00.000Z'
+            else:
+                datetimeFormat = str(year) + '-' + "{:02d}".format(month) + '-' + "{:02d}".format(day) + 'T' + "{:02d}".format(recorded_hour) + ':00:00.000Z'
+            
+            print("[INFO] Stored date: {}".format(datetimeFormat))
+
+            # Check data existance
+            check_url = API_ENDPOINT + datetimeFormat
+            check_data = urllib2.urlopen(check_url)
+            check_data_json = json.load(check_data)
+            needUpdate = False
+            if len(check_data_json) != 0:
+                print("[INFO] Wind data already exists")
+                storedRefTime = check_data_json[0]['header']['refTime']
+                date_time_obj = datetime.datetime.strptime(storedRefTime, '%Y-%m-%dT%H:%M:%S.%fZ')
+                storedRefTimeHour = date_time_obj.time().hour
+                if (storedRefTimeHour < refHour) or (storedRefTimeHour == 18 and refHour == 0):
+                    needUpdate = True
                 else:
-                    # Go back a month
-                    # Go back a day to the 28th
-                    getData(year, month - 1, 28, 18, sentinel - 1)
-            # If previous month has 31 days and it's the first day of the current month
-            elif (month == 2 or month == 4 or month == 6 or month == 9 or month == 11) and day == 1:
-                # Go back a month
-                # Go back a day to the 31st
-                getData(year, month - 1, 31, 18, sentinel - 1)
-            # If not beginning of a month
-            else:
-                # Go back a day
-                getData(year, month, day - 1, 18, sentinel - 1)
-        # If not midnight
-        else:
-            # Set ref hour back 6 hours
-            getData(year, month, day, refHour - 6, sentinel - 1)
-    # Ref hour directory available
-    else:
-        if refHour == 18:
-            storeRecordedDay = datetime.datetime.utcnow().day
-            storeRecordedMonth = datetime.datetime.utcnow().month
-            storeRecordedYear = datetime.datetime.utcnow().year
-            datetimeFormat = str(storeRecordedYear) + '-' + "{:02d}".format(storeRecordedMonth) + '-' + "{:02d}".format(storeRecordedDay) + 'T' + "{:02d}".format(recorded_hour) + ':00:00.000Z'
-        else:
-            datetimeFormat = str(year) + '-' + "{:02d}".format(month) + '-' + "{:02d}".format(day) + 'T' + "{:02d}".format(recorded_hour) + ':00:00.000Z'
-        print(datetimeFormat)
-        API_ENDPOINT = "https://api.sharedairdfw.com/wind_data/" + datetimeFormat
-        r = urllib2.urlopen(API_ENDPOINT)
-        x = json.load(r)
-        needUpdate = False
-        if len(x) != 0:
-            print("Data already exists")
-            storedRefTime = x[0]['header']['refTime']
-            date_time_obj = datetime.datetime.strptime(storedRefTime, '%Y-%m-%dT%H:%M:%S.%fZ')
-            storedRefTimeHour = date_time_obj.time().hour
-            if (storedRefTimeHour < refHour) or (storedRefTimeHour == 18 and refHour == 0):
-                needUpdate = True
-            else:
-                r.close()
-                sys.exit()
-        r.close()
-        local = './data/data.grb2'
-        dataPath = os.path.join(fdir, local)
-        f = open(dataPath, "wb")
-        content = u.read()
-        f.write(content)
-        f.close()
-        print("Downloading data: SUCCESS!")
-        convertData(year, month, day, refHour, needUpdate)
+                    check_data.close()
+                    sys.exit()
+            check_data.close()
+            local = './data/data.grb2'
+            dataPath = os.path.join(fdir, local)
+            data_file = open(dataPath, "wb")
+            content = fetched_data.read()
+            data_file.write(content)
+            data_file.close()
 
-getData(year, month, day, refHour, max_recursions)
+            print("[INFO] Data downloaded and processed successfully! Now storing data in database...")
+            convertData(year, month, day, refHour, recorded_hour, needUpdate)
+            return
+        
+        # The ref hour directory is not available (URL error occured)
+        # So access the previous ref hour file and/or directory
+        except urllib2.URLError as e:
+            print("[WARN]: {}".format(e))
+            print("[INFO] Checking previous file now...")
+            # If reference hour is midnight
+            if refHour == 0:
+                # If first day of January
+                if month == 1 and day == 1:
+                    year -= 1           # Go back a year
+                    month = 12          # Reset month to December
+                    day = 31            # Go back a day to December 31st (12/31)
+                    
+                # If previous month has 30 days and current day is the first day of the current month
+                elif (month == 5 or month == 7 or month == 8 or month == 10 or month == 12) and day == 1:
+                    month -= 1          # Go back a month
+                    day = 30            # Go back a day to the 30th
+                
+                # If current month is March and first day of the month
+                elif month == 3 and day == 1:
+                    
+                    if year % 4 == 0:   # If leap year
+                        month -= 1      # Go back a month
+                        day = 29        # Go back a day to the 29th
+
+                    else:               # If not leap year
+                        month -= 1      # Go back a month
+                        day = 28        # Go back a day to the 28th
+
+                # If previous month has 31 days and it's the first day of the current month
+                elif (month == 2 or month == 4 or month == 6 or month == 9 or month == 11) and day == 1:
+                    month -= 1          # Go back a month
+                    day = 31            # Go back a day to the 31st
+                
+                # If not beginning of a month
+                else:
+                    day -= 1            # Go back a day
+                
+                # Always reset refHour because we went back a day
+                refHour = 18
+            
+            # If not midnight
+            else:
+                # Set ref hour back 6 hours
+                refHour -= 6
+
+# Start
+getData()
+print("[INFO] Finished")
