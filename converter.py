@@ -178,6 +178,7 @@ def getData():
 
             print("[INFO] Data downloaded and processed successfully! Now storing data in database...")
             convertData(year, month, day, refHour, recorded_hour, needUpdate)
+            return
         
         # The ref hour directory is not available (URL error occured)
         # So access the previous ref hour file and/or directory
@@ -227,3 +228,4 @@ def getData():
 
 # Start
 getData()
+print("[INFO] Finished")
