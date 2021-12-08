@@ -34,7 +34,7 @@ fdir = os.path.abspath(os.path.dirname(__file__))
 #   day based on different reference hours available)
 max_attempts = 40
 
-def convertData(year, month, day, refHour, needUpdate):
+def convertData(year, month, day, refHour, recorded_hour, needUpdate):
     goToGrib2JSON = './grib2json/target/grib2json-0.8.0-SNAPSHOT/bin'
     gribPath = os.path.join(fdir, goToGrib2JSON)
     os.chdir(gribPath)
@@ -177,7 +177,7 @@ def getData():
             data_file.close()
 
             print("[INFO] Data downloaded and processed successfully! Now storing data in database...")
-            convertData(year, month, day, refHour, needUpdate)
+            convertData(year, month, day, refHour, recorded_hour, needUpdate)
         
         # The ref hour directory is not available (URL error occured)
         # So access the previous ref hour file and/or directory
